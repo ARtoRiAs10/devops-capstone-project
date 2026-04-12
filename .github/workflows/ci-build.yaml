@@ -11,17 +11,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # Run steps inside the Python container
     container: python:3.9-slim
 
     services:
       postgres:
         image: postgres:alpine
-        # env must be indented under the service name
         env:
-          POSTGRES_PASSWORD: pgs3cr3t
+          # Use a secret for the password to follow security best practices
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
           POSTGRES_DB: testdb
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -29,20 +29,24 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip wheel
           pip install -r requirements.txt
-      
-      # Added these steps to fulfill your Kanban story requirements:
+
       - name: Lint with flake8
         run: |
           pip install flake8
+          # Stops the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Run unit tests
+        env:
+          # hostname 'postgres' matches the service name defined above
+          DATABASE_URI: postgresql://postgres:${{ secrets.DB_PASSWORD }}@postgres:5432/testdb
+          FLASK_ENV: testing
         run: |
           nosetests
